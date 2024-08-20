@@ -72,8 +72,14 @@ pipeline {
             steps {
                 script {
                     def composeFile = readFile(DOCKER_COMPOSE_FILE)
-                    composeFile = composeFile.replaceAll(/(image: ${BACKEND_IMAGE}:)\S+/, "$1${BUILD_TAG}")
-                    composeFile = composeFile.replaceAll(/(image: ${FRONTEND_IMAGE}:)\S+/, "$1${BUILD_TAG}")
+                    
+                    // Escape dollar signs and brackets for Groovy string interpolation
+                    def backendImagePattern = /(image: ${BACKEND_IMAGE}:)\S+/
+                    def frontendImagePattern = /(image: ${FRONTEND_IMAGE}:)\S+/
+                    
+                    composeFile = composeFile.replaceAll(backendImagePattern, "\$1${BUILD_TAG}")
+                    composeFile = composeFile.replaceAll(frontendImagePattern, "\$1${BUILD_TAG}")
+                    
                     writeFile file: DOCKER_COMPOSE_FILE, text: composeFile
                 }
             }
