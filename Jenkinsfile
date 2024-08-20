@@ -8,7 +8,7 @@ pipeline {
         DOCKER_COMPOSE_FILE = 'docker-compose.yml'
         GCP_VM_USER = 'yassirdiri'
         GCP_VM_IP = '35.238.155.103'
-        GCP_SSH_KEY_ID = 'yassirdiri' // Replace with your Jenkins SSH credentials ID
+        GCP_SSH_KEY_ID = 'gcp-ssh-key-id' // Replace with your Jenkins SSH credentials ID
     }
     
     stages {
