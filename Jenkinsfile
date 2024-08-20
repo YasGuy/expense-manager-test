@@ -5,6 +5,10 @@ pipeline {
         BACKEND_IMAGE = "yassird/expense-manager-backend"
         FRONTEND_IMAGE = "yassird/expense-manager-frontend"
         BUILD_TAG = "${BUILD_ID}" // Use the Jenkins build ID as the tag
+        DOCKER_COMPOSE_FILE = 'docker-compose.yml'
+        GCP_VM_USER = 'yassirdiri'
+        GCP_VM_IP = '35.238.155.103'
+        GCP_SSH_KEY_ID = 'yassirdiri' // Replace with your Jenkins SSH credentials ID
     }
     
     stages {
@@ -63,6 +67,35 @@ pipeline {
                 sh 'docker push ${FRONTEND_IMAGE}:${BUILD_TAG}'
             }
         }
+
+        stage('Update Docker Compose File') {
+            steps {
+                script {
+                    def composeFile = readFile(DOCKER_COMPOSE_FILE)
+                    composeFile = composeFile.replaceAll(/(image: ${BACKEND_IMAGE}:)\S+/, "$1${BUILD_TAG}")
+                    composeFile = composeFile.replaceAll(/(image: ${FRONTEND_IMAGE}:)\S+/, "$1${BUILD_TAG}")
+                    writeFile file: DOCKER_COMPOSE_FILE, text: composeFile
+                }
+            }
+        }
+
+        stage('Deploy to GCP VM') {
+            steps {
+                script {
+                    sshagent([GCP_SSH_KEY_ID]) {
+                        sh "scp -o StrictHostKeyChecking=no ${DOCKER_COMPOSE_FILE} ${GCP_VM_USER}@${GCP_VM_IP}:~/"
+                        
+                        sh '''
+                            ssh -o StrictHostKeyChecking=no ${GCP_VM_USER}@${GCP_VM_IP} << EOF
+                            cd ~/
+                            docker-compose pull
+                            docker-compose up -d
+                            EOF
+                        '''
+                    }
+                }
+            }
+        }
     }
     
     post {
@@ -71,10 +104,10 @@ pipeline {
             sh 'docker rmi ${FRONTEND_IMAGE}:${BUILD_TAG} || true'
         }
         success {
-            echo 'Build completed successfully!'
+            echo 'Build and deployment completed successfully!'
         }
         failure {
-            echo 'Build failed. Please check the logs.'
+            echo 'Build or deployment failed. Please check the logs.'
         }
     }
 }
