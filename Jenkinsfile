@@ -94,8 +94,8 @@ pipeline {
                         sh '''
                             ssh -o StrictHostKeyChecking=no ${GCP_VM_USER}@${GCP_VM_IP} << EOF
                             cd ~/
-                            docker-compose pull
-                            docker-compose up -d
+                            docker compose pull
+                            docker compose up -d
                             EOF
                         '''
                     }
