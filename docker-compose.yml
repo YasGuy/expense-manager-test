@@ -3,8 +3,9 @@ services:
   db:
     image: mysql:9.0
     container_name: mysql_db
-    env_file:
-      - .env
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: expense_manager
     volumes:
       - db_data:/var/lib/mysql
     networks:
@@ -24,8 +25,12 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: node_backend
-    env_file:
-      - .env
+    environment:
+      DB_HOST: db
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_NAME: expense_manager
+      NODE_ENV: production
     depends_on:
       db:
         condition: service_healthy
@@ -43,11 +48,12 @@ services:
   # React Frontend
   frontend:
     build:
-      context: ./Frontend
+      context: ./frontend
       dockerfile: Dockerfile
     container_name: react_frontend
-    env_file:
-      - .env
+    environment:
+      REACT_APP_BACKEND_URL: http://localhost:5000
+      NODE_ENV: production
     depends_on:
       backend:
         condition: service_healthy
