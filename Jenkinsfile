@@ -97,7 +97,7 @@ pipeline {
                         
                 // Execute the docker-compose commands on the remote server
                         sh """
-                            ssh -o StrictHostKeyChecking=no ${GCP_VM_USER}@${GCP_VM_IP} << 'EOF'
+                            ssh -o StrictHostKeyChecking=no ${GCP_VM_USER}@${GCP_VM_IP} <<EOF
                             cd ~/
                             docker compose up -d
                             EOF
