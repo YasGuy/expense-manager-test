@@ -5,7 +5,7 @@ pipeline {
         BACKEND_IMAGE = "yassird/expense-manager-backend"
         FRONTEND_IMAGE = "yassird/expense-manager-frontend"
         BUILD_TAG = "${BUILD_ID}" // Use the Jenkins build ID as the tag
-        K8S_REPO_PATH = "~/Desktop/expense-manager-k8s" // Path to your already cloned repo
+        K8S_REPO_PATH = "/home/yassir/Desktop/expense-manager-k8s" // Path to your already cloned repo
         K8S_MANIFEST_REPO = "https://github.com/YasGuy/expense-manager-k8s.git"
         GITHUB_USERNAME = 'YasGuy'
     }
