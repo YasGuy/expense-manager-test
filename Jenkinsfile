@@ -44,75 +44,85 @@ pipeline {
                 '''
             }
         }
-        
-        stage('Build Backend Docker Image') {
+
+        stage('Run retire.js') {
             steps {
-                dir('backend') {
-                    sh 'docker build -t ${BACKEND_IMAGE}:${BUILD_TAG} .'
-                }
-            }
-        }
-        
-        stage('Build Frontend Docker Image') {
-            steps {
-                dir('frontend') {
-                    sh 'docker build -t ${FRONTEND_IMAGE}:${BUILD_TAG} .'
-                }
+                // Install retire.js globally
+                sh 'npm install -g retire'
+                
+                // Run retire.js on the entire workspace
+                sh 'retire --outputformat summary'
             }
         }
         
-        stage('Push Docker Images') {
-            steps {
-                sh 'docker push ${BACKEND_IMAGE}:${BUILD_TAG}'
-                sh 'docker push ${FRONTEND_IMAGE}:${BUILD_TAG}'
-            }
-        }
+    //     stage('Build Backend Docker Image') {
+    //         steps {
+    //             dir('backend') {
+    //                 sh 'docker build -t ${BACKEND_IMAGE}:${BUILD_TAG} .'
+    //             }
+    //         }
+    //     }
+        
+    //     stage('Build Frontend Docker Image') {
+    //         steps {
+    //             dir('frontend') {
+    //                 sh 'docker build -t ${FRONTEND_IMAGE}:${BUILD_TAG} .'
+    //             }
+    //         }
+    //     }
+        
+    //     stage('Push Docker Images') {
+    //         steps {
+    //             sh 'docker push ${BACKEND_IMAGE}:${BUILD_TAG}'
+    //             sh 'docker push ${FRONTEND_IMAGE}:${BUILD_TAG}'
+    //         }
+    //     }
 
-        stage('Update Docker Compose File') {
-            steps {
-                script {
-                    def composeFile = readFile(DOCKER_COMPOSE_FILE)
+    //     stage('Update Docker Compose File') {
+    //         steps {
+    //             script {
+    //                 def composeFile = readFile(DOCKER_COMPOSE_FILE)
                     
-                    // Escape dollar signs and brackets for Groovy string interpolation
-                    def backendImagePattern = /(image: ${BACKEND_IMAGE}:)\S+/
-                    def frontendImagePattern = /(image: ${FRONTEND_IMAGE}:)\S+/
+    //                 // Escape dollar signs and brackets for Groovy string interpolation
+    //                 def backendImagePattern = /(image: ${BACKEND_IMAGE}:)\S+/
+    //                 def frontendImagePattern = /(image: ${FRONTEND_IMAGE}:)\S+/
                     
-                    composeFile = composeFile.replaceAll(backendImagePattern, "\$1${BUILD_TAG}")
-                    composeFile = composeFile.replaceAll(frontendImagePattern, "\$1${BUILD_TAG}")
+    //                 composeFile = composeFile.replaceAll(backendImagePattern, "\$1${BUILD_TAG}")
+    //                 composeFile = composeFile.replaceAll(frontendImagePattern, "\$1${BUILD_TAG}")
                     
-                    writeFile file: DOCKER_COMPOSE_FILE, text: composeFile
+    //                 writeFile file: DOCKER_COMPOSE_FILE, text: composeFile
 
-                    // Print the updated docker-compose.yml file to the console
-                    echo 'Updated docker-compose.yml file:'
-                    sh 'cat ${DOCKER_COMPOSE_FILE}'
-                }
-            }
-        }
+    //                 // Print the updated docker-compose.yml file to the console
+    //                 echo 'Updated docker-compose.yml file:'
+    //                 sh 'cat ${DOCKER_COMPOSE_FILE}'
+    //             }
+    //         }
+    //     }
 
-        stage('Deploy to GCP VM') {
-            steps {
-                script {
-                    sshagent([GCP_SSH_KEY_ID]) {
-                        sh "scp -o StrictHostKeyChecking=no ${DOCKER_COMPOSE_FILE} ${GCP_VM_USER}@${GCP_VM_IP}:~/"
+    //     stage('Deploy to GCP VM') {
+    //         steps {
+    //             script {
+    //                 sshagent([GCP_SSH_KEY_ID]) {
+    //                     sh "scp -o StrictHostKeyChecking=no ${DOCKER_COMPOSE_FILE} ${GCP_VM_USER}@${GCP_VM_IP}:~/"
                         
-                        sh '''
-                            ssh -o StrictHostKeyChecking=no ${GCP_VM_USER}@${GCP_VM_IP} "docker compose down --rmi all"
-                        '''
+    //                     sh '''
+    //                         ssh -o StrictHostKeyChecking=no ${GCP_VM_USER}@${GCP_VM_IP} "docker compose down --rmi all"
+    //                     '''
 
-                        // SSH into the VM and pull the latest images
-                        sh '''
-                            ssh -o StrictHostKeyChecking=no ${GCP_VM_USER}@${GCP_VM_IP} "docker compose pull"
-                        '''
+    //                     // SSH into the VM and pull the latest images
+    //                     sh '''
+    //                         ssh -o StrictHostKeyChecking=no ${GCP_VM_USER}@${GCP_VM_IP} "docker compose pull"
+    //                     '''
 
-                        // SSH into the VM and rebuild and restart containers
-                        sh '''
-                            ssh -o StrictHostKeyChecking=no ${GCP_VM_USER}@${GCP_VM_IP} "docker compose up --build -d"
-                        '''
-                    }
-                }
-            }
-        }
-    }
+    //                     // SSH into the VM and rebuild and restart containers
+    //                     sh '''
+    //                         ssh -o StrictHostKeyChecking=no ${GCP_VM_USER}@${GCP_VM_IP} "docker compose up --build -d"
+    //                     '''
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
     
     post {
         always {
