@@ -95,7 +95,19 @@ pipeline {
                     sshagent([GCP_SSH_KEY_ID]) {
                         sh "scp -o StrictHostKeyChecking=no ${DOCKER_COMPOSE_FILE} ${GCP_VM_USER}@${GCP_VM_IP}:~/"
                         
-                        sh "ssh -o StrictHostKeyChecking=no ${GCP_VM_USER}@${GCP_VM_IP} 'cd ~/ && docker compose up -d'"
+                        sh '''
+                            ssh -o StrictHostKeyChecking=no ${GCP_VM_USER}@${GCP_VM_IP} "docker compose down --rmi all"
+                        '''
+
+                        // SSH into the VM and pull the latest images
+                        sh '''
+                            ssh -o StrictHostKeyChecking=no ${GCP_VM_USER}@${GCP_VM_IP} "docker compose pull"
+                        '''
+
+                        // SSH into the VM and rebuild and restart containers
+                        sh '''
+                            ssh -o StrictHostKeyChecking=no ${GCP_VM_USER}@${GCP_VM_IP} "docker compose up --build -d"
+                        '''
                     }
                 }
             }
