@@ -79,16 +79,16 @@ pipeline {
             steps {
                 script {
                     // Read backend deployment YAML file
-                    def backendDeployment = readFile("${K8S_REPO_PATH}/backend-deployment.yaml")
-                    def frontendDeployment = readFile("${K8S_REPO_PATH}/frontend-deployment.yaml")
+                    def backendDeployment = readFile("${K8S_REPO_PATH}/dev/backend-deployment.yaml")
+                    def frontendDeployment = readFile("${K8S_REPO_PATH}/dev/frontend-deployment.yaml")
                     
                     // Update image tag for backend and frontend deployments
                     backendDeployment = backendDeployment.replaceAll(/image: ${BACKEND_IMAGE}:\S+/, "image: ${BACKEND_IMAGE}:${BUILD_TAG}")
                     frontendDeployment = frontendDeployment.replaceAll(/image: ${FRONTEND_IMAGE}:\S+/, "image: ${FRONTEND_IMAGE}:${BUILD_TAG}")
                     
                     // Write updated YAML files back
-                    writeFile file: "${K8S_REPO_PATH}/backend-deployment.yaml", text: backendDeployment
-                    writeFile file: "${K8S_REPO_PATH}/frontend-deployment.yaml", text: frontendDeployment
+                    writeFile file: "${K8S_REPO_PATH}/dev/backend-deployment.yaml", text: backendDeployment
+                    writeFile file: "${K8S_REPO_PATH}/dev/frontend-deployment.yaml", text: frontendDeployment
                 }
             }
         }
