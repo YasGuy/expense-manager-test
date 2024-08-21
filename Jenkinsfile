@@ -1,16 +1,15 @@
 pipeline {
     agent any
-    
+
     environment {
         BACKEND_IMAGE = "yassird/expense-manager-backend"
         FRONTEND_IMAGE = "yassird/expense-manager-frontend"
         BUILD_TAG = "${BUILD_ID}" // Use the Jenkins build ID as the tag
-        DOCKER_COMPOSE_FILE = 'docker-compose.yml'
-        GCP_VM_USER = 'yassirdiri'
-        GCP_VM_IP = '35.225.130.175'
-        GCP_SSH_KEY_ID = 'yassirdiri' // Replace with your Jenkins SSH credentials ID
+        K8S_REPO_PATH = "~/Desktop/expense-manager-k8s" // Path to your already cloned repo
+        K8S_MANIFEST_REPO = "https://github.com/YasGuy/expense-manager-k8s.git"
+        GITHUB_USERNAME = 'YasGuy'
     }
-    
+
     stages {
         stage('Docker Login') {
             steps {
@@ -45,13 +44,6 @@ pipeline {
             }
         }
 
-        stage('Run retire.js') {
-            steps {
-                // Run retire.js on the entire workspace
-                sh 'retire --outputformat text'
-            }
-        }
-        
         stage('Build Backend Docker Image') {
             steps {
                 dir('backend') {
@@ -59,7 +51,7 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Build Frontend Docker Image') {
             steps {
                 dir('frontend') {
@@ -67,7 +59,7 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Push Docker Images') {
             steps {
                 sh 'docker push ${BACKEND_IMAGE}:${BUILD_TAG}'
@@ -75,52 +67,39 @@ pipeline {
             }
         }
 
-        stage('Update Docker Compose File') {
+        stage('Update Kubernetes Manifests') {
             steps {
                 script {
-                    def composeFile = readFile(DOCKER_COMPOSE_FILE)
-                    
-                    // Escape dollar signs and brackets for Groovy string interpolation
-                    def backendImagePattern = /(image: ${BACKEND_IMAGE}:)\S+/
-                    def frontendImagePattern = /(image: ${FRONTEND_IMAGE}:)\S+/
-                    
-                    composeFile = composeFile.replaceAll(backendImagePattern, "\$1${BUILD_TAG}")
-                    composeFile = composeFile.replaceAll(frontendImagePattern, "\$1${BUILD_TAG}")
-                    
-                    writeFile file: DOCKER_COMPOSE_FILE, text: composeFile
+                    // Update backend and frontend deployment manifests
+                    def backendManifest = readFile("${K8S_REPO_PATH}/backend-deployment.yaml")
+                    def frontendManifest = readFile("${K8S_REPO_PATH}/frontend-deployment.yaml")
 
-                    // Print the updated docker-compose.yml file to the console
-                    echo 'Updated docker-compose.yml file:'
-                    sh 'cat ${DOCKER_COMPOSE_FILE}'
+                    // Replace image tags in the manifests
+                    backendManifest = backendManifest.replaceAll(/(image: ${BACKEND_IMAGE}:)\S+/, "\$1${BUILD_TAG}")
+                    frontendManifest = frontendManifest.replaceAll(/(image: ${FRONTEND_IMAGE}:)\S+/, "\$1${BUILD_TAG}")
+
+                    // Write the updated manifests back to the files
+                    writeFile file: "${K8S_REPO_PATH}/backend-deployment.yaml", text: backendManifest
+                    writeFile file: "${K8S_REPO_PATH}/frontend-deployment.yaml", text: frontendManifest
                 }
             }
         }
 
-        stage('Deploy to GCP VM') {
+        stage('Push Updated Manifests to Git Repo') {
             steps {
-                script {
-                    sshagent([GCP_SSH_KEY_ID]) {
-                        sh "scp -o StrictHostKeyChecking=no ${DOCKER_COMPOSE_FILE} ${GCP_VM_USER}@${GCP_VM_IP}:~/"
-                        
+                withCredentials([string(credentialsId: 'github-pat', variable: 'GITHUB_TOKEN')]) {
+                    dir("${K8S_REPO_PATH}") {
                         sh '''
-                            ssh -o StrictHostKeyChecking=no ${GCP_VM_USER}@${GCP_VM_IP} "docker compose down --rmi all"
-                        '''
-
-                        // SSH into the VM and pull the latest images
-                        sh '''
-                            ssh -o StrictHostKeyChecking=no ${GCP_VM_USER}@${GCP_VM_IP} "docker compose pull"
-                        '''
-
-                        // SSH into the VM and rebuild and restart containers
-                        sh '''
-                            ssh -o StrictHostKeyChecking=no ${GCP_VM_USER}@${GCP_VM_IP} "docker compose up --build -d"
+                            git add .
+                            git commit -m "Update Kubernetes manifests with new image tags: ${BUILD_TAG}"
+                            git push https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/YasGuy/expense-manager-k8s.git main
                         '''
                     }
                 }
             }
         }
     }
-    
+
     post {
         always {
             sh 'docker rmi ${BACKEND_IMAGE}:${BUILD_TAG} || true'
