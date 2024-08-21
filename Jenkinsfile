@@ -51,7 +51,7 @@ pipeline {
                 sh 'sudo npm install -g retire'
                 
                 // Run retire.js on the entire workspace
-                sh 'sudo retire --outputformat summary'
+                sh 'retire --outputformat summary'
             }
         }
         
