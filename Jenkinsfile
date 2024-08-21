@@ -7,7 +7,7 @@ pipeline {
         BUILD_TAG = "${BUILD_ID}" // Use the Jenkins build ID as the tag
         DOCKER_COMPOSE_FILE = 'docker-compose.yml'
         GCP_VM_USER = 'yassirdiri'
-        GCP_VM_IP = '35.238.155.103'
+        GCP_VM_IP = '35.225.130.175'
         GCP_SSH_KEY_ID = 'yassirdiri' // Replace with your Jenkins SSH credentials ID
     }
     
