@@ -47,11 +47,8 @@ pipeline {
 
         stage('Run retire.js') {
             steps {
-                // Install retire.js globally
-                sh 'sudo npm install -g retire'
-                
                 // Run retire.js on the entire workspace
-                sh 'retire --outputformat summary'
+                sh 'retire --outputformat text'
             }
         }
         
