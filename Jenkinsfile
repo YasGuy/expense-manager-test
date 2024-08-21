@@ -1,15 +1,15 @@
 pipeline {
     agent any
-
+    
     environment {
         BACKEND_IMAGE = "yassird/expense-manager-backend"
         FRONTEND_IMAGE = "yassird/expense-manager-frontend"
         BUILD_TAG = "${BUILD_ID}" // Use the Jenkins build ID as the tag
-        K8S_REPO_PATH = "/home/yassir/Desktop/expense-manager-k8s" // Path to your already cloned repo
+        K8S_REPO_PATH = "${WORKSPACE}/expense-manager-k8s" // Cloned Kubernetes manifests repo
         K8S_MANIFEST_REPO = "https://github.com/YasGuy/expense-manager-k8s.git"
-        GITHUB_USERNAME = 'YasGuy'
+        GIT_CREDENTIALS_ID = "github-pat" // Jenkins credentials ID for GitHub PAT (token)
     }
-
+    
     stages {
         stage('Docker Login') {
             steps {
@@ -51,7 +51,7 @@ pipeline {
                 }
             }
         }
-
+        
         stage('Build Frontend Docker Image') {
             steps {
                 dir('frontend') {
@@ -59,40 +59,50 @@ pipeline {
                 }
             }
         }
-
+        
         stage('Push Docker Images') {
             steps {
                 sh 'docker push ${BACKEND_IMAGE}:${BUILD_TAG}'
                 sh 'docker push ${FRONTEND_IMAGE}:${BUILD_TAG}'
             }
         }
-
-        stage('Update Kubernetes Manifests') {
+        
+        stage('Clone Kubernetes Manifests Repo') {
             steps {
-                script {
-                    // Update backend and frontend deployment manifests
-                    def backendManifest = readFile("${K8S_REPO_PATH}/backend-deployment.yaml")
-                    def frontendManifest = readFile("${K8S_REPO_PATH}/frontend-deployment.yaml")
-
-                    // Replace image tags in the manifests
-                    backendManifest = backendManifest.replaceAll(/(image: ${BACKEND_IMAGE}:)\S+/, "\$1${BUILD_TAG}")
-                    frontendManifest = frontendManifest.replaceAll(/(image: ${FRONTEND_IMAGE}:)\S+/, "\$1${BUILD_TAG}")
-
-                    // Write the updated manifests back to the files
-                    writeFile file: "${K8S_REPO_PATH}/backend-deployment.yaml", text: backendManifest
-                    writeFile file: "${K8S_REPO_PATH}/frontend-deployment.yaml", text: frontendManifest
+                dir("${K8S_REPO_PATH}") {
+                    git url: "${K8S_MANIFEST_REPO}", branch: 'main', credentialsId: "${GIT_CREDENTIALS_ID}"
                 }
             }
         }
-
+        
+        stage('Update Kubernetes Manifests') {
+            steps {
+                script {
+                    // Read backend deployment YAML file
+                    def backendDeployment = readFile("${K8S_REPO_PATH}/backend-deployment.yaml")
+                    def frontendDeployment = readFile("${K8S_REPO_PATH}/frontend-deployment.yaml")
+                    
+                    // Update image tag for backend and frontend deployments
+                    backendDeployment = backendDeployment.replaceAll(/image: ${BACKEND_IMAGE}:\S+/, "image: ${BACKEND_IMAGE}:${BUILD_TAG}")
+                    frontendDeployment = frontendDeployment.replaceAll(/image: ${FRONTEND_IMAGE}:\S+/, "image: ${FRONTEND_IMAGE}:${BUILD_TAG}")
+                    
+                    // Write updated YAML files back
+                    writeFile file: "${K8S_REPO_PATH}/backend-deployment.yaml", text: backendDeployment
+                    writeFile file: "${K8S_REPO_PATH}/frontend-deployment.yaml", text: frontendDeployment
+                }
+            }
+        }
+        
         stage('Push Updated Manifests to Git Repo') {
             steps {
-                withCredentials([string(credentialsId: 'github-pat', variable: 'GITHUB_TOKEN')]) {
-                    dir("${K8S_REPO_PATH}") {
+                dir("${K8S_REPO_PATH}") {
+                    withCredentials([string(credentialsId: "${GIT_CREDENTIALS_ID}", variable: 'GITHUB_TOKEN')]) {
                         sh '''
+                            git config --global user.name "YasGuy"
+                            git config --global user.email "yassirdiri@gmail.com"
                             git add .
-                            git commit -m "Update Kubernetes manifests with new image tags: ${BUILD_TAG}"
-                            git push https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/YasGuy/expense-manager-k8s.git main
+                            git commit -m "Update deployment manifests with new image tags: ${BUILD_TAG}"
+                            git push https://$GITHUB_TOKEN@github.com/YasGuy/expense-manager-k8s.git main
                         '''
                     }
                 }
