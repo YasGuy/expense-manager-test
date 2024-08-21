@@ -81,6 +81,10 @@ pipeline {
                     composeFile = composeFile.replaceAll(frontendImagePattern, "\$1${BUILD_TAG}")
                     
                     writeFile file: DOCKER_COMPOSE_FILE, text: composeFile
+
+                    // Print the updated docker-compose.yml file to the console
+                    echo 'Updated docker-compose.yml file:'
+                    sh 'cat ${DOCKER_COMPOSE_FILE}'
                 }
             }
         }
@@ -94,7 +98,6 @@ pipeline {
                         sh '''
                             ssh -o StrictHostKeyChecking=no ${GCP_VM_USER}@${GCP_VM_IP} << EOF
                             cd ~/
-                            docker compose pull
                             docker compose up -d
                             EOF
                         '''
