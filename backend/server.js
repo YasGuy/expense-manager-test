@@ -5,7 +5,7 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const client = require('prom-client');
 
-//wow
+// Create an Express application
 const app = express();
 app.use(bodyParser.json());
 app.use(cors({
@@ -33,74 +33,30 @@ const appUpMetric = new client.Gauge({
 // Set the initial state of the app to up
 appUpMetric.set(1);
 
-// MySQL connection configuration
+// MySQL connection pooling configuration
 const dbConfig = {
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME
+  database: process.env.DB_NAME,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
 };
 
-let db;
+const pool = mysql.createPool(dbConfig);
 
-function connectWithRetry() {
-  db = mysql.createConnection(dbConfig);
-  
-  db.connect((err) => {
+// Function to test database connection
+function testDbConnection(callback) {
+  pool.query('SELECT 1', (err) => {
     if (err) {
-      console.error('Error connecting to the database:', err);
-      console.log('Retrying in 5 seconds...');
-      setTimeout(connectWithRetry, 5000);
+      console.error('Database connection test failed:', err);
+      callback(err);
     } else {
-      console.log('Connected to MySQL database');
-      initializeTables();
-    }
-  });
-
-  db.on('error', (err) => {
-    console.error('Database error:', err);
-    if (err.code === 'PROTOCOL_CONNECTION_LOST') {
-      connectWithRetry();
-    } else {
-      throw err;
+      callback(null);
     }
   });
 }
-
-function initializeTables() {
-  const createExpensesTable = `
-    CREATE TABLE IF NOT EXISTS expenses (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      description VARCHAR(255) NOT NULL,
-      amount DECIMAL(10, 2) NOT NULL,
-      date DATE NOT NULL,
-      category VARCHAR(255) NOT NULL
-    );
-  `;
-  const createSalaryTable = `
-    CREATE TABLE IF NOT EXISTS salary (
-      id INT PRIMARY KEY,
-      amount DECIMAL(10, 2) NOT NULL
-    );
-  `;
-  db.query(createExpensesTable, (err) => {
-    if (err) {
-      console.error('Error creating expenses table:', err);
-    } else {
-      console.log('Expenses table created or already exists');
-    }
-  });
-  db.query(createSalaryTable, (err) => {
-    if (err) {
-      console.error('Error creating salary table:', err);
-    } else {
-      console.log('Salary table created or already exists');
-    }
-  });
-}
-
-// Start the connection process
-connectWithRetry();
 
 // Middleware to track metrics for all routes
 app.use((req, res, next) => {
@@ -114,15 +70,17 @@ app.use((req, res, next) => {
 
 // Database connection check middleware
 const checkDbConnection = (req, res, next) => {
-  if (!db || db.state === 'disconnected') {
-    return res.status(503).json({ error: 'Database connection not established' });
-  }
-  next();
+  testDbConnection((err) => {
+    if (err) {
+      return res.status(503).json({ error: 'Database connection not established' });
+    }
+    next();
+  });
 };
 
 // API Endpoints
 app.get('/expenses', checkDbConnection, (req, res) => {
-  db.query('SELECT * FROM expenses', (err, results) => {
+  pool.query('SELECT * FROM expenses', (err, results) => {
     if (err) {
       console.error('Error fetching expenses:', err);
       return res.status(500).json({ error: 'Failed to fetch expenses' });
@@ -139,7 +97,7 @@ app.post('/expenses', checkDbConnection, (req, res) => {
   }
 
   const query = 'INSERT INTO expenses (description, amount, date, category) VALUES (?, ?, ?, ?)';
-  db.query(query, [description, amount, date, category], (err, results) => {
+  pool.query(query, [description, amount, date, category], (err, results) => {
     if (err) {
       console.error('Error adding expense:', err);
       return res.status(500).json({ error: 'Failed to add expense' });
@@ -149,7 +107,7 @@ app.post('/expenses', checkDbConnection, (req, res) => {
 });
 
 app.get('/salary', checkDbConnection, (req, res) => {
-  db.query('SELECT amount FROM salary WHERE id = 1', (err, results) => {
+  pool.query('SELECT amount FROM salary WHERE id = 1', (err, results) => {
     if (err) {
       console.error('Error fetching salary:', err);
       return res.status(500).json({ error: 'Failed to fetch salary' });
@@ -166,7 +124,7 @@ app.post('/salary', checkDbConnection, (req, res) => {
   }
 
   const query = 'REPLACE INTO salary (id, amount) VALUES (1, ?)';
-  db.query(query, [amount], (err) => {
+  pool.query(query, [amount], (err) => {
     if (err) {
       console.error('Error updating salary:', err);
       return res.status(500).json({ error: 'Failed to update salary' });
@@ -184,6 +142,17 @@ app.get('/fail', (req, res) => {
 // Health Check Endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
+});
+
+// Database health check endpoint
+app.get('/db-health', (req, res) => {
+  testDbConnection((err) => {
+    if (err) {
+      res.status(500).json({ status: 'db_down', error: 'Database is down' });
+    } else {
+      res.status(200).json({ status: 'db_up' });
+    }
+  });
 });
 
 // Prometheus metrics endpoint

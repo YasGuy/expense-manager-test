@@ -1,12 +1,10 @@
 const request = require('supertest');
-const express = require('express');
 
-// Mock mysql2 before requiring the app
+// Mock mysql2 to use createPool
 jest.mock('mysql2', () => ({
-  createConnection: jest.fn(() => ({
-    connect: jest.fn((callback) => callback()),
-    query: jest.fn(),
-    on: jest.fn(),
+  createPool: jest.fn(() => ({
+    query: jest.fn(), // Mock query method if needed
+    on: jest.fn(),   // Mock event listener if needed
   })),
 }));
 

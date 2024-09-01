@@ -2,7 +2,6 @@ services:
   # MySQL Database
   db:
     image: mysql:9.0
-    container_name: mysql_db
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: expense_manager
@@ -12,17 +11,14 @@ services:
       - app-network
     ports:
       - "3306:3306"
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
-      retries: 5
-      start_period: 30s
-      timeout: 10s
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
 
   # Node.js Backend
   backend:
     image: yassird/expense-manager-backend:latest
-    container_name: node_backend
     environment:
       DB_HOST: db
       DB_USER: root
@@ -30,34 +26,33 @@ services:
       DB_NAME: expense_manager
       NODE_ENV: production
     depends_on:
-      db:
-        condition: service_healthy
+      - db
     networks:
       - app-network
     ports:
       - "5000:5000"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
-      interval: 10s
-      retries: 5
-      start_period: 30s
-      timeout: 10s
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
 
   # React Frontend
   frontend:
     image: yassird/expense-manager-frontend:latest
-    container_name: react_frontend
     depends_on:
-      backend:
-        condition: service_healthy
+      - backend
     ports:
       - "80:80"
     networks:
       - app-network
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
 
 networks:
   app-network:
-    driver: bridge
+    driver: overlay   # Use overlay networks in Docker Swarm
 
 volumes:
   db_data:
