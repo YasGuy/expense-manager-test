@@ -58,6 +58,52 @@ function testDbConnection(callback) {
   });
 }
 
+// Function to create tables if they do not exist
+function createTables(callback) {
+  const createSalaryTableQuery = `
+    CREATE TABLE IF NOT EXISTS salary (
+      id INT PRIMARY KEY,
+      amount DECIMAL(10, 2) NOT NULL
+    );
+  `;
+
+  const createExpensesTableQuery = `
+    CREATE TABLE IF NOT EXISTS expenses (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      description VARCHAR(255) NOT NULL,
+      amount DECIMAL(10, 2) NOT NULL,
+      date DATE NOT NULL,
+      category VARCHAR(255) NOT NULL
+    );
+  `;
+
+  pool.query(createSalaryTableQuery, (err) => {
+    if (err) {
+      console.error('Error creating salary table:', err);
+      return callback(err);
+    }
+
+    pool.query(createExpensesTableQuery, (err) => {
+      if (err) {
+        console.error('Error creating expenses table:', err);
+        return callback(err);
+      }
+
+      callback(null);
+    });
+  });
+}
+
+// Initialize the database tables when the app starts
+createTables((err) => {
+  if (err) {
+    console.error('Failed to initialize database tables:', err);
+    process.exit(1);
+  } else {
+    console.log('Database tables initialized successfully');
+  }
+});
+
 // Middleware to track metrics for all routes
 app.use((req, res, next) => {
   const start = Date.now();
